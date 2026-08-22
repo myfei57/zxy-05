@@ -20,7 +20,18 @@ func Tick(state *store.State, now time.Time) ([]*store.Notification, error) {
 		if !ok {
 			continue
 		}
-		_ = alarm.ShouldEscalate(a)
+		// Escalation tracks the alarm's live state, not the open-time snapshot
+		// captured when the timer was created. Once an operator has acknowledged
+		// the alarm or the point has recovered, it no longer needs escalation:
+		// cancel the pending timer instead of firing against stale open-time
+		// data and dispatching notifications for an already-handled alarm.
+		if !alarm.ShouldEscalate(a) {
+			e.State = store.EscalationDone
+			if err := state.PutEscalation(e); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if now.Before(e.DueAt) {
 			continue
 		}
