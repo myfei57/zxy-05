@@ -21,13 +21,9 @@ func Acknowledge(state *store.State, alarmID, owner, reason string, at time.Time
 	if a.Status != store.AlarmOpen {
 		return ErrAlarmNotOpen
 	}
-	a.Status = store.AlarmAcknowledged
-	a.AckedAt = at
-	a.Owner = owner
-	a.Reason = reason
-	if err := state.PutAlarm(a); err != nil {
-		return err
-	}
+	// Persist the durable owner record first. Only once attribution has
+	// landed do we advance the alarm to acknowledged, so a failed owner
+	// write leaves the alarm open instead of a confirmed-but-unowned state.
 	record := &store.AlarmOwner{
 		AlarmID: alarmID,
 		Owner:   owner,
@@ -37,5 +33,9 @@ func Acknowledge(state *store.State, alarmID, owner, reason string, at time.Time
 	if err := state.PutOwner(record); err != nil {
 		return err
 	}
-	return nil
+	a.Status = store.AlarmAcknowledged
+	a.AckedAt = at
+	a.Owner = owner
+	a.Reason = reason
+	return state.PutAlarm(a)
 }
