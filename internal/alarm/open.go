@@ -13,8 +13,18 @@ import (
 // OpenOrUpdate opens a new alarm for a breaching sample or refreshes the
 // latest active alarm of the same point. The maintenance window is checked
 // before any state is written, so routine fluctuations inside a window never
-// produce alarms.
+// produce or refresh alarms; a suppressed breach returns nil.
 func OpenOrUpdate(state *store.State, sample *store.Sample, entry store.RuleSnapshotEntry, at time.Time) (*store.Alarm, error) {
+	// Check the maintenance window first. While the device is in a window,
+	// routine fluctuations must not open, refresh, or reopen any alarm, so
+	// nothing is written and the caller is told no alarm was produced.
+	inWindow, err := schedule.InWindow(state, sample.DeviceID, at)
+	if err != nil {
+		return nil, err
+	}
+	if inWindow {
+		return nil, nil
+	}
 	existing, ok := state.AlarmByPoint(sample.PointID)
 	if ok {
 		if existing.Status == store.AlarmOpen || existing.Status == store.AlarmAcknowledged {
@@ -43,11 +53,6 @@ func OpenOrUpdate(state *store.State, sample *store.Sample, entry store.RuleSnap
 	if err := state.PutAlarm(a); err != nil {
 		return nil, err
 	}
-	inWindow, err := schedule.InWindow(state, sample.DeviceID, at)
-	if err != nil {
-		return nil, err
-	}
-	_ = inWindow
 	auditEntry := &store.AuditEntry{
 		ID:     uuid.NewString(),
 		Action: "alarm_open",

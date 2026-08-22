@@ -44,7 +44,11 @@ func EvaluateSamples(state *store.State, samples []*store.Sample, at time.Time) 
 			if err != nil {
 				return nil, err
 			}
-			opened = append(opened, a)
+			// nil means the breach was suppressed by a maintenance
+			// window; skip it so no alarm or escalation is created.
+			if a != nil {
+				opened = append(opened, a)
+			}
 		} else {
 			if err := alarm.ResolveIfOpen(state, sample.PointID, at); err != nil {
 				return nil, err
