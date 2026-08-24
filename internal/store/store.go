@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -192,8 +193,14 @@ func (s *State) Versions() []*RuleVersion {
 func (s *State) SetEffective(v int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Persist first; only swing the in-memory pointer once the durable copy is
+	// written. If the write fails the caller must keep the old effective version
+	// rather than point evaluation at a version with no snapshot.
+	if err := SaveJSON(filepath.Join(s.root, "effective.json"), v); err != nil {
+		return err
+	}
 	s.effective = v
-	return SaveJSON(filepath.Join(s.root, "effective.json"), v)
+	return nil
 }
 
 func (s *State) Effective() int64 {
@@ -409,6 +416,12 @@ func (s *State) AuditEntries() []*AuditEntry {
 
 func (s *State) SaveSnapshot(version int64, entries []RuleSnapshotEntry) error {
 	return SaveJSON(filepath.Join(s.root, "snapshots", strconv.FormatInt(version, 10)+".json"), entries)
+}
+
+// DeleteSnapshot removes a snapshot file, used to clean up a half-written
+// snapshot after a failed publish so it cannot be loaded or rolled back to.
+func (s *State) DeleteSnapshot(version int64) error {
+	return os.Remove(filepath.Join(s.root, "snapshots", strconv.FormatInt(version, 10)+".json"))
 }
 
 func (s *State) LoadSnapshot(version int64) ([]RuleSnapshotEntry, error) {
