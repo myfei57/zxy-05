@@ -19,7 +19,7 @@ func Reopen(state *store.State, existing *store.Alarm, sample *store.Sample, ent
 		PointName:       sample.PointName,
 		DeviceID:        sample.DeviceID,
 		Status:          store.AlarmOpen,
-		OriginalOpenAt:  at,
+		OriginalOpenAt:  existing.OriginalOpenAt,
 		LastTriggerAt:   at,
 		LastValue:       sample.Value,
 		EscalationLevel: 0,
