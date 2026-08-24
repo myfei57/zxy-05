@@ -16,8 +16,8 @@ var ErrNoRoute = errors.New("no reachable notification channel")
 // Dispatch sends one notification for an alarm escalation through the live
 // route table.
 func Dispatch(state *store.State, alarmID string, level int, at time.Time) (*store.Notification, error) {
-	routeID := channel.CachedRoute(state)
-	if routeID == "" {
+	routeID, err := channel.CurrentRoute(state)
+	if err != nil || routeID == "" {
 		return nil, ErrNoRoute
 	}
 	c, ok := state.Channel(routeID)

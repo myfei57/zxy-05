@@ -34,5 +34,9 @@ func Failover(state *store.State, channelID string) error {
 		return errors.New("channel does not exist")
 	}
 	c.Reachable = false
-	return state.PutChannel(c)
+	if err := state.PutChannel(c); err != nil {
+		return err
+	}
+	_, err := CurrentRoute(state)
+	return err
 }
